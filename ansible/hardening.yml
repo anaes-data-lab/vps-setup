@@ -1,0 +1,161 @@
+---
+- name: Bootstrap base services and mail relay
+  hosts: localhost
+  become: true
+
+  pre_tasks:
+    - name: Load .env variables
+      include_vars:
+        file: "{{ playbook_dir }}/.env"
+        format: dotenv
+
+  tasks:
+    # ─── Update apt cache ──────────────────────────────────────────────────────────
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # ─── 1. Time sync (Chrony) ────────────────────────────────────────────────────
+    - name: Install Chrony
+      apt:
+        name: chrony
+        state: present
+
+    - name: Ensure Chrony is running & enabled
+      service:
+        name: chrony
+        state: started
+        enabled: yes
+
+    # ─── 2. Host firewall (UFW) ────────────────────────────────────────────────────
+    - name: Install UFW
+      apt:
+        name: ufw
+        state: present
+
+    - name: Deny all incoming by default
+      ufw:
+        state: enabled
+        direction: incoming
+        policy: deny
+
+    - name: Allow all outgoing by default
+      ufw:
+        state: enabled
+        direction: outgoing
+        policy: allow
+
+    - name: Allow SSH
+      ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: Allow HTTP
+      ufw:
+        rule: allow
+        port: 80
+        proto: tcp
+
+    - name: Allow HTTPS
+      ufw:
+        rule: allow
+        port: 443
+        proto: tcp
+
+    # ─── 3. File-integrity monitoring (auditd) ────────────────────────────────────
+    - name: Install auditd
+      apt:
+        name: auditd
+        state: present
+
+    - name: Ensure auditd is running & enabled
+      service:
+        name: auditd
+        state: started
+        enabled: yes
+
+    # ─── 4. Rootkit scanning (rkhunter) ───────────────────────────────────────────
+    - name: Install rkhunter
+      apt:
+        name: rkhunter
+        state: present
+
+    - name: Update rkhunter data files
+      command: rkhunter --update
+
+    - name: Initialize rkhunter property database
+      command: rkhunter --propupd
+
+    # ─── 5. Log summaries (Logwatch) ──────────────────────────────────────────────
+    - name: Install logwatch
+      apt:
+        name: logwatch
+        state: present
+
+    - name: Schedule daily logwatch report
+      cron:
+        name: "Run logwatch"
+        job: "/usr/sbin/logwatch --output mail --mailto root"
+        minute: 0
+        hour: 3
+
+    # ─── 6. Resource monitoring (Prometheus Node Exporter) ────────────────────────
+    - name: Install prometheus-node-exporter
+      apt:
+        name: prometheus-node-exporter
+        state: present
+
+    - name: Ensure node-exporter is running & enabled
+      service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: yes
+
+    # ─── 7. Mail relay via msmtp ──────────────────────────────────────────────────
+    - name: Install msmtp-mta & mailutils
+      apt:
+        name:
+          - msmtp-mta
+          - mailutils
+        state: present
+        update_cache: yes
+
+    - name: Deploy /etc/msmtprc
+      copy:
+        dest: /etc/msmtprc
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          defaults
+          auth           on
+          tls            on
+          tls_trust_file /etc/ssl/certs/ca-certificates.crt
+          logfile        /var/log/msmtp.log
+
+          account        default
+          host           {{ MSMTP_HOST }}
+          port           {{ MSMTP_PORT }}
+          from           {{ MSMTP_USER }}
+          user           {{ MSMTP_USER }}
+          password       {{ MSMTP_PASSWORD }}
+
+          account default : default
+
+    - name: Ensure root mail is forwarded
+      lineinfile:
+        dest: /etc/aliases
+        regexp: '^root:'
+        line: "root: {{ MSMTP_USER }}"
+        create: yes
+
+    - name: Apply newaliases
+      command: newaliases
+
+- name: Secure VPS with Docker support
+  hosts: localhost
+  become: true
+  roles:
+    - devsec.hardening.os_hardening
+    - devsec.hardening.ssh_hardening
