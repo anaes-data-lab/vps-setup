@@ -3,12 +3,6 @@
   hosts: localhost
   become: true
 
-  pre_tasks:
-    - name: Load .env variables
-      include_vars:
-        file: "{{ playbook_dir }}/.env"
-        format: dotenv
-
   tasks:
     # ─── Update apt cache ──────────────────────────────────────────────────────────
     - name: Update apt cache
@@ -135,11 +129,11 @@
           logfile        /var/log/msmtp.log
 
           account        default
-          host           {{ MSMTP_HOST }}
-          port           {{ MSMTP_PORT }}
-          from           {{ MSMTP_USER }}
-          user           {{ MSMTP_USER }}
-          password       {{ MSMTP_PASSWORD }}
+          host           {{ msmtp_host }}
+          port           {{ msmtp_port }}
+          from           {{ msmtp_user }}
+          user           {{ msmtp_user }}
+          password       {{ msmtp_password }}
 
           account default : default
 
@@ -147,7 +141,7 @@
       lineinfile:
         dest: /etc/aliases
         regexp: '^root:'
-        line: "root: {{ MSMTP_USER }}"
+        line: "root: {{ msmtp_user }}"
         create: yes
 
     - name: Apply newaliases
@@ -163,4 +157,3 @@
   roles:
     - os_hardening
     - ssh_hardening
-

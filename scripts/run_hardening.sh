@@ -16,6 +16,7 @@ echo "[+] Installing devsec.hardening collection"
 ansible-galaxy collection install devsec.hardening
 
 echo "[+] Running Ansible hardening playbook"
-ansible-playbook -i localhost, ../ansible/hardening.yml
+ANSIBLE_HOST_KEY_CHECKING=False
+ansible-playbook -i localhost, ../ansible/hardening.yml -c local
 
 echo "[✓] Hardening complete."

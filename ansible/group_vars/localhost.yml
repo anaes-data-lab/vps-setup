@@ -15,3 +15,9 @@ ssh_client_alive_count: 2
 # — Docker networking preserved —
 sysctl_overwrite:
   net.ipv4.ip_forward: 1
+
+# - VPS email credentials -
+msmtp_host: smtp.gmail.com
+msmtp_port: 587
+msmtp_user: your.email@gmail.com
+msmtp_password: YOUR_APP_PASSWORD
