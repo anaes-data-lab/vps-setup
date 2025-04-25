@@ -6,11 +6,32 @@
     - "{{ playbook_dir }}/group_vars/localhost.yml"
 
   tasks:
-    # ─── Update apt cache ──────────────────────────────────────────────────────────
+    # ─── Update apt cache and upgrade ──────────────────────────────────────────────────────────
     - name: Update apt cache
       apt:
         update_cache: yes
         cache_valid_time: 3600
+
+    - name: Upgrade all installed packages to the latest version
+      apt:
+        upgrade: dist
+        update_cache: yes
+    
+    # ─── Setup automatic updates ──────────────────────────────────────────────────────────
+    - name: Install unattended-upgrades
+      apt:
+        name: unattended-upgrades
+        state: present
+        update_cache: yes
+
+    - name: Enable automatic security updates
+      copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade   "1";
+          APT::Periodic::AutocleanInterval    "7";
+        mode: '0644'
 
     # ─── 1. Time sync (Chrony) ────────────────────────────────────────────────────
     - name: Install Chrony
