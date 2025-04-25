@@ -8,6 +8,13 @@ echo "[+] Creating user: $NEW_USER"
 adduser --disabled-password --gecos "" "$NEW_USER"
 usermod -aG sudo "$NEW_USER"
 
+echo "[+] Granting $NEW_USER passwordless sudo"
+# create a sudoers snippet
+cat > /etc/sudoers.d/010_${NEW_USER}_nopasswd <<EOF
+${NEW_USER} ALL=(ALL) NOPASSWD:ALL
+EOF
+chmod 440 /etc/sudoers.d/010_${NEW_USER}_nopasswd
+
 echo "[+] Installing Docker"
 apt update
 apt install -y docker.io docker-compose
