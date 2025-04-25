@@ -2,6 +2,8 @@
 - name: Bootstrap base services and mail relay
   hosts: localhost
   become: true
+  vars_files:
+    - "{{ playbook_dir }}/group_vars/localhost.yml"
 
   tasks:
     # ─── Update apt cache ──────────────────────────────────────────────────────────
