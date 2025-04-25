@@ -158,6 +158,10 @@
   hosts: localhost
   become: true
 
+  pre_tasks:
+    - name: Ensure all SSH host keys are present
+      command: ssh-keygen -A
+
   collections:
     - devsec.hardening
 
