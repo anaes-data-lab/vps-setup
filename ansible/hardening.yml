@@ -70,23 +70,18 @@
         enabled: yes
 
     # ─── 4. Rootkit scanning (rkhunter) ───────────────────────────────────────────
-    - name: Install rkhunter and wget
+    - name: Install rkhunter
       apt:
-        name:
-          - rkhunter
-          - wget
+        name: rkhunter
         state: present
         update_cache: yes
 
-    - name: Configure rkhunter to use wget for updates
-      lineinfile:
-        path: /etc/rkhunter.conf
-        regexp: '^WEB_CMD='
-        line: 'WEB_CMD="/usr/bin/wget"'
-        backrefs: no
-
-    - name: Update rkhunter data files
-      command: rkhunter --update
+    - name: Skip remote rkhunter updates (disabled upstream)
+      debug:
+        msg: |
+          Debian deliberately ships rkhunter with WEB_CMD="/bin/false" to
+          disable insecure mirror updates.  We rely on `apt upgrade rkhunter`
+          for signature updates rather than `rkhunter --update`.
 
     - name: Initialize rkhunter property database
       command: rkhunter --propupd
