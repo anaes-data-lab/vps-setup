@@ -12,6 +12,8 @@ apt update
 apt install -y software-properties-common
 add-apt-repository --yes --update ppa:ansible/ansible
 apt install -y ansible git
+echo "[+] Installing devsec.hardening collection"
+ansible-galaxy collection install devsec.hardening
 
 echo "[+] Running Ansible hardening playbook"
 ansible-playbook -i localhost, ../ansible/hardening.yml
