@@ -70,10 +70,20 @@
         enabled: yes
 
     # ─── 4. Rootkit scanning (rkhunter) ───────────────────────────────────────────
-    - name: Install rkhunter
+    - name: Install rkhunter and wget
       apt:
-        name: rkhunter
+        name:
+          - rkhunter
+          - wget
         state: present
+        update_cache: yes
+
+    - name: Configure rkhunter to use wget for updates
+      lineinfile:
+        path: /etc/rkhunter.conf
+        regexp: '^WEB_CMD='
+        line: 'WEB_CMD="/usr/bin/wget"'
+        backrefs: no
 
     - name: Update rkhunter data files
       command: rkhunter --update
