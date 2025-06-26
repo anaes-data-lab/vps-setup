@@ -13,11 +13,11 @@ if ! command -v restic &>/dev/null; then
 fi
 
 # 2) Prompt for B2 credentials & repo info
-read -p "Backblaze B2 Account ID: " B2_ACCOUNT_ID
+read -p "Backblaze B2 Key ID: " B2_ACCOUNT_ID
 read -p "Backblaze B2 Account Key: " B2_ACCOUNT_KEY
 read -p "Backblaze B2 Bucket name: " B2_BUCKET
 read -p "Restic repo path inside bucket (e.g. tljh-backups): " RESTIC_PATH
-read -s -p "Restic repository password: " RESTIC_PASSWORD
+read -s -p "Create a Restic repository password: " RESTIC_PASSWORD
 echo
 
 # 3) Write environment file
@@ -52,11 +52,12 @@ if ! restic snapshots >/dev/null 2>&1; then
 fi
 
 # perform backup
-restic backup /etc/tljh /srv/data /home \
+restic backup /opt/tljh/hub /srv/data /home \
   --verbose --tag tljh
 
 # prune old snapshots
 restic forget \
+    --keep-hourly 24 \
     --keep-daily 7 \
     --keep-weekly 4 \
     --keep-monthly 12 \
@@ -70,11 +71,11 @@ chmod +x "$BACKUP_SCRIPT"
 # 5) Install cron job
 CRON_FILE=/etc/cron.d/tljh-restic-backup
 cat >"$CRON_FILE" <<EOF
-# Run TLJH Restic backup at 02:00 daily
-0 2 * * * root $BACKUP_SCRIPT >> /var/log/tljh-restic-backup.log 2>&1
+# Run TLJH Restic backup hourly
+0 * * * * root $BACKUP_SCRIPT >> /var/log/tljh-restic-backup.log 2>&1
 EOF
 
 echo "✅ Restic backup setup complete!
 – Edit $ENV_FILE to rotate credentials or change bucket/repo
-– Backups will run daily at 02:00 via cron
+– Backups will run hourly via cron
 – Logs at /var/log/tljh-restic-backup.log"
