@@ -105,6 +105,12 @@
           Debian deliberately ships rkhunter with WEB_CMD="/bin/false" to
           disable insecure mirror updates.  We rely on `apt upgrade rkhunter`
           for signature updates rather than `rkhunter --update`.
+    
+    - name: Remove deprecated SCRIPTWHITELIST entries from rkhunter.conf
+      lineinfile:
+        path: /etc/rkhunter.conf
+        regexp: '^SCRIPTWHITELIST=.*\/usr\/bin\/(egrep|fgrep)'
+        state: absent
 
     - name: Initialize rkhunter property database
       command: rkhunter --propupd
