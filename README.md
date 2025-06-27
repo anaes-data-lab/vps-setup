@@ -7,5 +7,7 @@ Macos: `pbcopy < ~/.ssh/id_ed25519.pub`
 
 # The Littlest JupyterHub
 
-Ensure permissions are set: `sudo chmod -R a+rX /opt/tljh/user`
-sudo chmod -R 755 /opt/tljh/
+Ensure permissions are set: 
+
+`sudo chmod -R a+rX /opt/tljh/user`
+`sudo chmod +x /opt/tljh/user/bin/python3`

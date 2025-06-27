@@ -1,88 +1,86 @@
 #!/usr/bin/env bash
-#
-# tljh-restic-restore.sh
-# Restore from TLJH Restic backups on Backblaze B2.
-# Usage:
-#   sudo tljh-restic-restore.sh [-s SNAPSHOT] [-t TARGET_DIR] [-p PATH]...
-# Examples:
-#   # full restore of latest into /mnt/restore
-#   sudo tljh-restic-restore.sh
-#   # restore snapshot 5 into /backup/tljh, only /etc/tljh and /home
-#   sudo tljh-restic-restore.sh -s 5 -t /backup/tljh \
-#       -p /etc/tljh -p /home
-
 set -euo pipefail
 
-ENV_FILE=/etc/restic-backup.env
+source /etc/restic-backup.env
 
-if [[ ! -r $ENV_FILE ]]; then
-  echo "❌ Cannot read credentials file $ENV_FILE"
-  exit 1
-fi
+RESTORE_PATH=/srv/tljh-restore
+LOGFILE=/var/log/tljh-restic-restore.log
 
-# Load B2 creds & repo settings
-# (expects B2_ACCOUNT_ID, B2_ACCOUNT_KEY, RESTIC_REPOSITORY, RESTIC_PASSWORD)
-source "$ENV_FILE"
+mkdir -p "$RESTORE_PATH"
+mkdir -p "$(dirname "$LOGFILE")"
+touch "$LOGFILE"
+chmod 600 "$LOGFILE"
 
-# defaults
-snapshot="latest"
-target="/mnt/restore"
-includes=()
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting restore..." >> "$LOGFILE"
 
-usage() {
-  cat <<EOF
-Usage: $0 [-s SNAPSHOT] [-t TARGET_DIR] [-p PATH]...
-  -s SNAPSHOT     restic snapshot ID or 'latest' (default: latest)
-  -t TARGET_DIR   directory to restore into (default: $target)
-  -p PATH         path within snapshot to include; repeatable
-  -h              show this help
-EOF
-  exit 1
-}
-
-# parse flags
-while getopts ":s:t:p:h" opt; do
-  case $opt in
-    s) snapshot="$OPTARG" ;;
-    t) target="$OPTARG" ;;
-    p) includes+=("$OPTARG") ;;
-    h) usage ;;
-    *) usage ;;
-  esac
-done
-
-echo "🔍 Available TLJH snapshots (tag tljh):"
+# Show available snapshots
 restic snapshots --tag tljh
-echo
-
-echo "📌 Restoring snapshot: $snapshot"
-echo "📂 Target directory : $target"
-if [ ${#includes[@]} -gt 0 ]; then
-  echo "➡️  Including only paths:"
-  for p in "${includes[@]}"; do echo "   - $p"; done
-else
-  echo "➡️  Restoring entire snapshot"
+read -p "Enter snapshot ID (or leave blank for latest): " SNAPSHOT
+SNAPSHOT_ARG=()
+if [[ -n "$SNAPSHOT" ]]; then
+    SNAPSHOT_ARG=(--snapshot "$SNAPSHOT")
 fi
-echo
 
-# ensure target exists
-mkdir -p "$target"
-chmod 700 "$target"
+# Restore files
+restic restore "${SNAPSHOT_ARG[@]}" --target "$RESTORE_PATH"
 
-# build restic command
-cmd=(restic restore "$snapshot" --target "$target")
-for p in "${includes[@]}"; do
-  cmd+=(--include "$p")
-done
+# Reinstall TLJH if needed
+if ! command -v tljh-config &>/dev/null; then
+    echo "TLJH not found, reinstalling..."
+    curl https://tljh.jupyter.org/bootstrap.py | sudo python3
+fi
 
-# run restore
-"${cmd[@]}"
+# Restore TLJH state
+echo "Restoring TLJH state..."
+rsync -a "$RESTORE_PATH/opt/tljh/state/" /opt/tljh/state/
 
-echo
-echo "✅ Restore complete. Check your files under $target"
-echo "   When ready, stop TLJH services and copy files back:"
-echo "     systemctl stop jupyterhub"
-echo "     rsync -a $target/etc/tljh/ /etc/tljh/"
-echo "     rsync -a $target/srv/data/ /srv/data/"
-echo "     rsync -a $target/home/ /home/"
-echo "     systemctl start jupyterhub"
+# Restore config
+META="$RESTORE_PATH/srv/tljh-backup-meta"
+if [ -f "$META/tljh-config.yaml" ]; then
+    tljh-config import "$META/tljh-config.yaml"
+    tljh-config reload
+fi
+
+# Recreate users
+USER_LIST="$META/jupyter-users.txt"
+if [ -f "$USER_LIST" ]; then
+    while read -r user; do
+        if ! id "$user" &>/dev/null; then
+            echo "Creating user: $user"
+            useradd -m -s /bin/bash "$user"
+        fi
+    done < "$USER_LIST"
+fi
+
+# Restore home and shared data
+echo "Restoring home directories..."
+rsync -a "$RESTORE_PATH/home/" /home/
+echo "Restoring /srv/data..."
+rsync -a "$RESTORE_PATH/srv/data/" /srv/data/
+
+# Restore kernelspecs
+echo "Restoring Jupyter kernelspecs..."
+if [ -d "$META/kernelspecs/tljh-user" ]; then
+  cp -r "$META/kernelspecs/tljh-user/"* /opt/tljh/user/share/jupyter/kernels/
+fi
+if [ -d "$META/kernelspecs/system" ]; then
+  cp -r "$META/kernelspecs/system/"* /usr/local/share/jupyter/kernels/
+fi
+
+# Reinstall R packages
+RPKG="$META/r-packages.txt"
+if [ -f "$RPKG" ] && command -v Rscript &>/dev/null; then
+  echo "Reinstalling R packages from $RPKG"
+  Rscript -e 'pkgs <- readLines("'"$RPKG"'"); install.packages(pkgs, repos="https://cloud.r-project.org")'
+fi
+
+# Reinstall Python packages
+REQS="$META/user-requirements.txt"
+if [ -f "$REQS" ]; then
+    source /opt/tljh/user/bin/activate
+    pip install -r "$REQS"
+    deactivate
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restore complete." >> "$LOGFILE"
+echo "✅ Restore finished. Log: $LOGFILE"
