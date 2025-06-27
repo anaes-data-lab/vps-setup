@@ -1,4 +1,37 @@
 #!/usr/bin/env bash
+#
+# setup-restic-backup.sh
+# Run as root: sudo bash setup-restic-backup.sh
+
+set -euo pipefail
+
+# 1. Install Restic if missing
+if ! command -v restic &>/dev/null; then
+  apt update && apt install -y restic
+fi
+
+# 2. Prompt for B2 credentials
+read -p "Backblaze B2 Key ID: " B2_ACCOUNT_ID
+read -p "Backblaze B2 Account Key: " B2_ACCOUNT_KEY
+read -p "Backblaze B2 Bucket name: " B2_BUCKET
+read -p "Restic repo path inside bucket (e.g. tljh-backups): " RESTIC_PATH
+read -s -p "Create a Restic repository password: " RESTIC_PASSWORD
+echo
+
+# 3. Create environment file
+ENV_FILE=/etc/restic-backup.env
+cat >"$ENV_FILE" <<EOF
+export B2_ACCOUNT_ID="${B2_ACCOUNT_ID}"
+export B2_ACCOUNT_KEY="${B2_ACCOUNT_KEY}"
+export RESTIC_REPOSITORY="b2:${B2_BUCKET}:${RESTIC_PATH}"
+export RESTIC_PASSWORD="${RESTIC_PASSWORD}"
+EOF
+chmod 600 "$ENV_FILE"
+
+# 4. Install backup script
+BACKUP_SCRIPT=/usr/local/bin/tljh-restic-backup.sh
+cat >"$BACKUP_SCRIPT" <<'EOF'
+#!/usr/bin/env bash
 set -euo pipefail
 
 source /etc/restic-backup.env
@@ -56,3 +89,18 @@ restic forget \
   --prune
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup OK" >> "$LOGFILE"
+EOF
+
+chmod +x "$BACKUP_SCRIPT"
+
+# 5. Create cron job
+CRON_FILE=/etc/cron.d/tljh-restic-backup
+cat >"$CRON_FILE" <<EOF
+0 * * * * root $BACKUP_SCRIPT
+EOF
+
+echo "✅ Restic backup setup complete!
+– Credentials: $ENV_FILE
+– Backup script: $BACKUP_SCRIPT
+– Cron job: $CRON_FILE
+– Logs: /var/log/tljh-restic-backup.log"
