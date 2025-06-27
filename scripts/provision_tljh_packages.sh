@@ -12,12 +12,17 @@ sudo /opt/tljh/user/bin/pip install \
 echo "📊 Installing R and IRkernel (lightweight)..."
 sudo apt update
 sudo apt install -y --no-install-recommends \
-  r-base libcurl4-openssl-dev libssl-dev libxml2-dev
+  r-base build-essential gfortran \
+  libcurl4-openssl-dev libssl-dev libxml2-dev
 
 sudo R --no-save <<EOF
+Sys.setenv(PATH=paste("/opt/tljh/user/bin", Sys.getenv("PATH"), sep=":"))
 install.packages(c('IRkernel', 'ggplot2', 'dplyr'), repos='https://cloud.r-project.org')
 IRkernel::installspec(user = FALSE)
 EOF
+
+# Move IRkernel into TLJH's environment (required for TLJH visibility)
+sudo mv /usr/local/share/jupyter/kernels/ir /opt/tljh/user/share/jupyter/kernels/
 
 echo "🛡️ Setting TLJH resource limits..."
 sudo tljh-config set limits.memory 512M
