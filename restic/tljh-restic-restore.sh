@@ -35,8 +35,8 @@ rsync -a "$RESTORE_PATH/opt/tljh/state/" /opt/tljh/state/
 # Restore config
 META="$RESTORE_PATH/srv/tljh-backup-meta"
 if [ -f "$META/tljh-config.yaml" ]; then
-    tljh-config import "$META/tljh-config.yaml"
-    tljh-config reload
+    echo "⚠️  TLJH config found at $META/tljh-config.yaml"
+    echo "📝 Please reapply relevant settings manually using 'tljh-config set ...'"
 fi
 
 # Recreate users
