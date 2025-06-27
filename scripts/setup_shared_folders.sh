@@ -1,40 +1,32 @@
 #!/usr/bin/env bash
-# TLJH shared folders setup script
-# Run as root: sudo bash setup-shared-folders.sh
+set -euo pipefail
 
-set -euxo pipefail
+echo "🔧 Setting up shared directories..."
 
-# 1. Ensure jupyter-users group exists
-groupadd --force jupyter-users || true
+# Create the shared data folders
+sudo mkdir -p /srv/shared /srv/datasets
 
-# 2. Add all current Jupyter users to the group
-for u in $(cut -d: -f1 /etc/passwd | grep '^jupyter-'); do
-  usermod -aG jupyter-users "$u"
-done
+# Set ownership and permissions
+sudo chown root:jupyter-users /srv/shared
+sudo chmod 2775 /srv/shared  # rwxrwsr-x, sticky group bit
 
-# 3. Create /srv/data/shared (writable by all users)
-mkdir -p /srv/data/shared
-chown root:jupyter-users /srv/data/shared
-chmod 2775 /srv/data/shared  # rwxr-sr-x to maintain group on new files
-setfacl -d -m g::rwx /srv/data/shared  # default ACL for group write
+sudo chown root:jupyterhub-admins /srv/datasets
+sudo chmod 2755 /srv/datasets  # rwxr-sr-x, only admins can write
 
-# 4. Create /srv/data/datasets (read-only, writable only by admins)
-mkdir -p /srv/data/datasets
-chown root:jupyterhub-admins /srv/data/datasets
-chmod 755 /srv/data/datasets  # readable by all, writable only by admins
+echo "📁 Shared folders created and permissions set."
 
-# 5. Update skeleton for new users
-ln -sf /srv/data/shared /etc/skel/shared
-ln -sf /srv/data/datasets /etc/skel/datasets
+# Create symlinks in /etc/skel so new users see them
+sudo rm -f /etc/skel/shared /etc/skel/datasets
+sudo ln -s /srv/shared /etc/skel/shared
+sudo ln -s /srv/datasets /etc/skel/datasets
 
-# 6. Add symlinks for existing users
-for u in $(cut -d: -f1 /etc/passwd | grep '^jupyter-'); do
-  HOME_DIR="/home/$u"
-  ln -sf /srv/data/shared "$HOME_DIR/shared"
-  ln -sf /srv/data/datasets "$HOME_DIR/datasets"
-  chown -h "$u:$u" "$HOME_DIR/shared" "$HOME_DIR/datasets"
-done
+# Copy the README for new users
+if [[ -f "user-readme.md" ]]; then
+    sudo cp user-readme.md /etc/skel/README.md
+    sudo chmod 644 /etc/skel/README.md
+    echo "📝 README installed in /etc/skel."
+else
+    echo "⚠️  user-readme.md not found! Skipping README installation."
+fi
 
-echo "✅ Shared folders set up:"
-echo "– ~/shared   (read/write for all users)"
-echo "– ~/datasets (read-only for users, writable by admins)"
+echo "✅ Setup complete."
