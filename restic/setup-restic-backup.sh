@@ -104,3 +104,5 @@ echo "✅ Restic backup setup complete!
 – Backup script: $BACKUP_SCRIPT
 – Cron job: $CRON_FILE
 – Logs: /var/log/tljh-restic-backup.log"
+
+echo "Run sudo /usr/local/bin/tljh-restic-backup.sh to test"

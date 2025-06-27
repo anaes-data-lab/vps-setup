@@ -16,13 +16,11 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting restore..." >> "$LOGFILE"
 # Show available snapshots
 restic snapshots --tag tljh
 read -p "Enter snapshot ID (or leave blank for latest): " SNAPSHOT
-SNAPSHOT_ARG=()
 if [[ -n "$SNAPSHOT" ]]; then
-    SNAPSHOT_ARG=(--snapshot "$SNAPSHOT")
+    restic restore "$SNAPSHOT" --target "$RESTORE_PATH"
+else
+    restic restore latest --target "$RESTORE_PATH"
 fi
-
-# Restore files
-restic restore "${SNAPSHOT_ARG[@]}" --target "$RESTORE_PATH"
 
 # Reinstall TLJH if needed
 if ! command -v tljh-config &>/dev/null; then
