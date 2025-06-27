@@ -53,8 +53,12 @@ fi
 # Restore home and shared data
 echo "Restoring home directories..."
 rsync -a "$RESTORE_PATH/home/" /home/
-echo "Restoring /srv/data..."
-rsync -a "$RESTORE_PATH/srv/data/" /srv/data/
+if [ -d "$RESTORE_PATH/srv/data" ]; then
+    echo "Restoring /srv/data..."
+    rsync -a "$RESTORE_PATH/srv/data/" /srv/data/
+else
+    echo "⚠️  /srv/data not present in this snapshot — skipping"
+fi
 
 # Restore kernelspecs
 echo "Restoring Jupyter kernelspecs..."
