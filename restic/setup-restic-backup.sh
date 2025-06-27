@@ -46,9 +46,13 @@ mkdir -p "$BACKUP_META_DIR"
 # Dump TLJH config
 tljh-config show > "$BACKUP_META_DIR/tljh-config.yaml"
 [ -f /opt/tljh/config/jupyterhub_config.py ] && cp /opt/tljh/config/jupyterhub_config.py "$BACKUP_META_DIR/" || true
+
+# Record clean, portable Python requirements
 source /opt/tljh/user/bin/activate
-pip freeze > "$BACKUP_META_DIR/user-requirements.txt"
+pip list --format=freeze > "$BACKUP_META_DIR/user-requirements.txt"
 deactivate
+
+# List TLJH users
 cut -d: -f1 /etc/passwd | grep '^jupyter-' > "$BACKUP_META_DIR/jupyter-users.txt"
 
 # Log installed R packages (if present)
@@ -103,6 +107,8 @@ echo "✅ Restic backup setup complete!
 – Credentials: $ENV_FILE
 – Backup script: $BACKUP_SCRIPT
 – Cron job: $CRON_FILE
-– Logs: /var/log/tljh-restic-backup.log"
+– Logs: /var/log/tljh-restic-backup.log
 
-echo "Run sudo /usr/local/bin/tljh-restic-backup.sh to test"
+💡 You can test now with:
+  sudo $BACKUP_SCRIPT
+"
