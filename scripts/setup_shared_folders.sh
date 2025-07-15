@@ -30,9 +30,19 @@ for path in "${!DIRS[@]}"; do
   sudo chmod "$perm" "$path"
 done
 
-echo "✅ Shared folder structure in place."
+# 4) Fix permissions on existing content and enforce setgid inheritance
+echo "🔧 Applying group permissions recursively and setgid defaults"
+sudo chmod -R g+rwX /srv/shared
+sudo chmod -R g+rwX /srv/datasets
+# Set default ACLs so new files inherit group write
+if command -v setfacl >/dev/null 2>&1; then
+  sudo setfacl -R -d -m g::rwx /srv/shared
+  sudo setfacl -R -d -m g::rwx /srv/datasets
+fi
 
-# 4) Create or update symlinks in /etc/skel
+echo "✅ Shared folder structure in place with recursive permissions."
+
+# 5) Create or update symlinks in /etc/skel
 echo "🔗 Creating symlinks in /etc/skel"
 for name in shared datasets; do
   target="/srv/$name"
@@ -43,7 +53,7 @@ for name in shared datasets; do
   fi
 done
 
-# 5) Install README for new users, if present
+# 6) Install README for new users, if present
 if [ -f "user-readme.md" ]; then
   echo "📝 Installing README to /etc/skel"
   sudo install -m 644 user-readme.md /etc/skel/README.md
