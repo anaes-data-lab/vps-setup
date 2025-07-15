@@ -10,4 +10,4 @@ Macos: `pbcopy < ~/.ssh/id_ed25519.pub`
 Ensure permissions are set: 
 
 `sudo chmod -R a+rX /opt/tljh/user`
-`sudo chmod +x /opt/tljh/user/bin/python3`
+`sudo chmod a+x /opt/tljh/user/bin/python3`

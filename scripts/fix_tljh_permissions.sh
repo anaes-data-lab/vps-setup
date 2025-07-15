@@ -1,5 +1,8 @@
 #!/bin/bash
-chmod a+rx /opt
-chmod a+rx /opt/tljh
+
+# Ensure TLJH base directories are accessible
+chmod a+rx /opt /opt/tljh
+
+# Set readable and traversable permissions on all files and folders in TLJH user env
 find /opt/tljh/user -type d -exec chmod a+rx {} +
-chmod -R a+r /opt/tljh/user
+find /opt/tljh/user -type f -exec chmod a+r {} +

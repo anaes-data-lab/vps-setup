@@ -3,30 +3,52 @@ set -euo pipefail
 
 echo "🔧 Setting up shared directories..."
 
-# Create the shared data folders
-sudo mkdir -p /srv/shared /srv/datasets
+# 1) Ensure required groups exist
+groups=(jupyterhub-users jupyterhub-admins)
+for grp in "${groups[@]}"; do
+  if ! getent group "$grp" >/dev/null; then
+    echo "➕ Creating group: $grp"
+    sudo groupadd "$grp"
+  fi
+done
 
-# Set ownership and permissions
-sudo chown root:jupyter-users /srv/shared
-sudo chmod 2775 /srv/shared  # rwxrwsr-x, sticky group bit
+# 2) Define directories, owners, groups, and permissions
+#    Format: path=owner:group:perm
+declare -A DIRS=(
+  ["/srv/shared"]="root:jupyterhub-users:2775"
+  ["/srv/shared/.ipynb_checkpoints"]="root:jupyterhub-users:2775"
+  ["/srv/datasets"]="root:jupyterhub-admins:2775"
+  ["/srv/datasets/.ipynb_checkpoints"]="root:jupyterhub-admins:2775"
+)
 
-sudo chown root:jupyterhub-admins /srv/datasets
-sudo chmod 2755 /srv/datasets  # rwxr-sr-x, only admins can write
+# 3) Create and configure each directory
+for path in "${!DIRS[@]}"; do
+  IFS=":" read -r owner group perm <<< "${DIRS[$path]}"
+  echo "📂 Ensuring $path ($owner:$group, chmod $perm)"
+  sudo mkdir -p "$path"
+  sudo chown "$owner":"$group" "$path"
+  sudo chmod "$perm" "$path"
+done
 
-echo "📁 Shared folders created and permissions set."
+echo "✅ Shared folder structure in place."
 
-# Create symlinks in /etc/skel so new users see them
-sudo rm -f /etc/skel/shared /etc/skel/datasets
-sudo ln -s /srv/shared /etc/skel/shared
-sudo ln -s /srv/datasets /etc/skel/datasets
+# 4) Create or update symlinks in /etc/skel
+echo "🔗 Creating symlinks in /etc/skel"
+for name in shared datasets; do
+  target="/srv/$name"
+  link="/etc/skel/$name"
+  if [ ! -L "$link" ] || [ "$(readlink "$link")" != "$target" ]; then
+    echo "   ↪ Linking $link -> $target"
+    sudo ln -sfn "$target" "$link"
+  fi
+done
 
-# Copy the README for new users
-if [[ -f "user-readme.md" ]]; then
-    sudo cp user-readme.md /etc/skel/README.md
-    sudo chmod 644 /etc/skel/README.md
-    echo "📝 README installed in /etc/skel."
+# 5) Install README for new users, if present
+if [ -f "user-readme.md" ]; then
+  echo "📝 Installing README to /etc/skel"
+  sudo install -m 644 user-readme.md /etc/skel/README.md
 else
-    echo "⚠️  user-readme.md not found! Skipping README installation."
+  echo "⚠️  user-readme.md not found; skipping README"
 fi
 
-echo "✅ Setup complete."
+echo "🎉 Setup complete."
